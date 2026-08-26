@@ -46,7 +46,7 @@
     TypeScript:      "https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/typescript/typescript-original.svg",
     Python:          "https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/python/python-original.svg",
     Rust:            "https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/rust/rust-original.svg",
-    Go:              "https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/go/go-original-wordmark.svg",
+    Go:              "https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/go/go-original.svg",
     Java:            "https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/java/java-original.svg",
     "C++":           "https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/cplusplus/cplusplus-original.svg",
     C:               "https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/c/c-original.svg",
@@ -60,7 +60,7 @@
     CSS:             "https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/css3/css3-original.svg",
     HTML:            "https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/html5/html5-original.svg",
     Dockerfile:      "https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/docker/docker-original.svg",
-    "Jupyter Notebook": "https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/jupyter/jupyter-original-wordmark.svg",
+    "Jupyter Notebook": "https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/jupyter/jupyter-original.svg",
     Vue:             "https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/vuejs/vuejs-original.svg",
     Zig:             "https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/zig/zig-original.svg",
   };
@@ -247,7 +247,9 @@
 
   // ---------- charts ----------
   function make(id, cfg) {
-    return new Chart(document.getElementById(`c-${id}`), cfg);
+    const canvas = document.getElementById(`c-${id}`);
+    Chart.getChart(canvas)?.destroy();   // reuse the canvas: kill any prior chart first
+    return new Chart(canvas, cfg);
   }
   function story(id, text) {
     document.getElementById(`story-${id}`).textContent = text;
@@ -640,7 +642,7 @@
     grid.hidden = true;
     errorBox.hidden = true;
 
-    Object.values(Chart.instances || {}).forEach((c) => { try { c.destroy(); } catch (_) {} });
+    document.querySelectorAll('canvas[id^="c-"]').forEach((cv) => Chart.getChart(cv)?.destroy());
     document.querySelectorAll(".card").forEach((c) => c.classList.remove("in"));
 
     const isTrending = days === "trending";
