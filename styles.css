@@ -134,15 +134,6 @@ a:hover { text-decoration: underline; }
   color: #fff;
   font-weight: 600;
 }
-.range-btn--trending {
-  background: rgba(57,135,229,0.12);
-  border-color: var(--s1);
-  color: var(--s1);
-  font-weight: 600;
-  margin-right: 6px;
-}
-.range-btn--trending:hover { background: rgba(57,135,229,0.22); color: var(--s1); }
-.range-btn--trending.active { background: var(--s1); color: #fff; }
 
 .card-trophy {
   display: inline-block;

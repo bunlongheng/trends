@@ -173,42 +173,6 @@
     owner: r.owner.login, topics: r.topics || [], created: r.created_at, url: r.html_url,
   });
 
-  // Real github.com/trending repos - week of 2026-08-10
-  const REAL_TRENDING_REPOS = [
-    "huangruiteng/loopx",
-    "firecrawl/pdf-inspector",
-    "TencentCloud/TencentDB-Agent-Memory",
-    "zhaoxuya520/reverse-skill",
-    "esengine/DeepSeek-Reasonix",
-    "lyogavin/airllm",
-    "semantica-agi/semantica",
-    "google/skills",
-    "virgiliojr94/book-to-skill",
-    "unclebob/swarm-forge",
-    "drawdb-io/drawdb",
-    "usekaneo/kaneo",
-    "microsoft/AI-For-Beginners",
-    "Comfy-Org/ComfyUI",
-    "vitali87/code-graph-rag",
-    "goauthentik/authentik",
-    "DataExpert-io/data-engineer-handbook",
-  ];
-
-  function fetchRealTrending() {
-    return load("gvt-trending-2026-08-10", async () => {
-      const results = await Promise.all(
-        REAL_TRENDING_REPOS.map(async (fullName) => {
-          const res = await fetch(`https://api.github.com/repos/${fullName}`, {
-            headers: { Accept: "application/vnd.github+json" },
-          });
-          if (!res.ok) return null;
-          return mapRepo(await res.json());
-        })
-      );
-      return results.filter(Boolean);
-    });
-  }
-
   const daysAgo = (n) => {
     const d = new Date(Date.now() - n * 864e5);
     return d.toISOString().slice(0, 10);
@@ -244,6 +208,72 @@
   }
 
   const ageDays = (r) => Math.max(1, (Date.now() - new Date(r.created).getTime()) / 864e5);
+
+  // value labels: compact numbers at the end of every bar, white totals inside
+  // every doughnut slice. Global plugin - it self-skips scatter/line charts.
+  const label = (n) => compact.format(n).toLowerCase();   // 12345 -> "12k"
+  Chart.register({
+    id: "valueLabels",
+    afterDatasetsDraw(chart) {
+      const type = chart.config.type;
+      if (type !== "bar" && type !== "doughnut" && type !== "pie") return;
+      const { ctx, chartArea } = chart;
+      ctx.save();
+      ctx.font = "600 11px " + Chart.defaults.font.family;
+
+      if (type === "bar") {
+        const horizontal = chart.options.indexAxis === "y";
+        chart.data.datasets.forEach((ds, di) => {
+          const meta = chart.getDatasetMeta(di);
+          if (meta.hidden) return;
+          meta.data.forEach((bar, i) => {
+            const raw = ds.data[i];
+            if (raw == null || raw === 0) return;
+            const txt = label(raw);
+            const { x, y } = bar.getProps(["x", "y"], true);
+            const w = ctx.measureText(txt).width;
+            if (horizontal) {
+              ctx.textBaseline = "middle";
+              if (chartArea.right - x > w + 10) {          // room past the tip
+                ctx.textAlign = "left"; ctx.fillStyle = INK2;
+                ctx.fillText(txt, x + 5, y);
+              } else {                                       // bar fills the track - sit inside
+                ctx.textAlign = "right"; ctx.fillStyle = "#fff";
+                ctx.fillText(txt, x - 5, y);
+              }
+            } else {
+              ctx.textAlign = "center";
+              if (y - chartArea.top > 16) {                 // room above the top
+                ctx.textBaseline = "bottom"; ctx.fillStyle = INK2;
+                ctx.fillText(txt, x, y - 4);
+              } else {
+                ctx.textBaseline = "top"; ctx.fillStyle = "#fff";
+                ctx.fillText(txt, x, y + 4);
+              }
+            }
+          });
+        });
+      } else {                                               // doughnut / pie
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.shadowColor = "rgba(0,0,0,0.55)";
+        ctx.shadowBlur = 3;
+        ctx.fillStyle = "#fff";
+        chart.data.datasets.forEach((ds, di) => {
+          const meta = chart.getDatasetMeta(di);
+          meta.data.forEach((arc, i) => {
+            const raw = ds.data[i];
+            if (raw == null || raw === 0) return;
+            const { circumference } = arc.getProps(["circumference"], true);
+            if (circumference < 0.28) return;                // skip slivers (~16deg)
+            const p = arc.getCenterPoint(true);
+            ctx.fillText(label(raw), p.x, p.y);
+          });
+        });
+      }
+      ctx.restore();
+    },
+  });
 
   // ---------- charts ----------
   function make(id, cfg) {
@@ -645,10 +675,8 @@
     document.querySelectorAll('canvas[id^="c-"]').forEach((cv) => Chart.getChart(cv)?.destroy());
     document.querySelectorAll(".card").forEach((c) => c.classList.remove("in"));
 
-    const isTrending = days === "trending";
-
     try {
-      const items = isTrending ? await fetchRealTrending() : await fetchTrending(days);
+      const items = await fetchTrending(days);
       loading.hidden = true;
       grid.hidden = false;
       render(items);
@@ -660,17 +688,17 @@
     }
   }
 
-  // shareable deep links: ?interval=day|week|month|3m|6m|1y|3y|5y (bare URL = trending)
-  const DAYS_TO_NAME = { trending: "trending", "1": "day", "7": "week", "30": "month", "90": "3m", "180": "6m", "365": "1y", "1095": "3y", "1825": "5y" };
+  // shareable deep links: ?interval=day|month|3m|6m|1y|3y|5y (bare URL = week, the default)
+  const DAYS_TO_NAME = { "1": "day", "7": "week", "30": "month", "90": "3m", "180": "6m", "365": "1y", "1095": "3y", "1825": "5y" };
   const NAME_TO_DAYS = Object.fromEntries(Object.entries(DAYS_TO_NAME).map(([d, n]) => [n, d]));
 
   function selectRange(daysVal, syncUrl) {
     document.querySelectorAll(".range-btn").forEach((b) => b.classList.toggle("active", b.dataset.days === daysVal));
     if (syncUrl) {
-      const name = DAYS_TO_NAME[daysVal] || "trending";
-      history.replaceState(null, "", name === "trending" ? location.pathname : `?interval=${name}`);
+      const name = DAYS_TO_NAME[daysVal];
+      history.replaceState(null, "", name === "week" ? location.pathname : `?interval=${name}`);
     }
-    refreshCharts(daysVal === "trending" ? "trending" : Number(daysVal));
+    refreshCharts(Number(daysVal));
   }
 
   document.getElementById("rangeBar").addEventListener("click", (e) => {
@@ -680,10 +708,10 @@
 
   const fromUrl = () => {
     const name = new URLSearchParams(location.search).get("interval");
-    return (name && NAME_TO_DAYS[name]) || "trending";
+    return (name && NAME_TO_DAYS[name]) || "7";
   };
   window.addEventListener("popstate", () => selectRange(fromUrl(), false));
 
-  // boot: honor ?interval= if present, otherwise the trending default
+  // boot: honor ?interval= if present, otherwise the week default
   selectRange(fromUrl(), false);
 })();
