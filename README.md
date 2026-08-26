@@ -1,3 +1,13 @@
+<div align="center">
+  <img src="docs/icon.png" alt="Trends" width="96" height="96" />
+  <h1>Trends</h1>
+  <p><em>GitHub's trending repos as 12 animated Chart.js charts, with click-through to each repo</em></p>
+  <p><a href="https://trends-bheng.vercel.app">Live</a> &middot; <a href="https://github.com/bunlongheng/trends">Repo</a> &middot; <a href="https://bunlongheng.com/projects?name=trends">Portfolio</a></p>
+  <img src="docs/social-preview.png" alt="Trends - preview" width="820" />
+</div>
+
+---
+
 # Trends
 
 [github.com/trending](https://github.com/trending) is a list. Lists hide the story. Trends pulls
